@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Curl 转 Requests</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #121212;
+      --panel: #1b1b1b;
+      --panel-deep: #161616;
+      --panel-soft: #202020;
+      --line: #303030;
+      --line-strong: #414141;
+      --text: #f2f0ed;
+      --muted: #96928d;
+      --muted-strong: #c1bdb7;
+      --accent: #e7ff58;
+      --accent-ink: #161616;
+      --blue: #83a8ff;
+      --danger: #ff9b8f;
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, textarea { font: inherit; }
+    button { cursor: pointer; }
+    button:disabled { cursor: not-allowed; }
+
+    .app-shell {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background:
+        radial-gradient(circle at 0 0, rgba(231, 255, 88, 0.045), transparent 31rem),
+        var(--bg);
+    }
+
+    .topbar {
+      height: 76px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 44px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 230px;
+    }
+
+    .brand-mark {
+      width: 30px;
+      height: 30px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      color: var(--accent);
+      font: 700 15px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .brand-name {
+      font-size: 18px;
+      font-weight: 750;
+      letter-spacing: 0.01em;
+    }
+
+    .brand-subtitle {
+      margin-left: 2px;
+      color: var(--muted);
+      font: 12px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .top-button, .icon-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      height: 34px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--muted-strong);
+      font-size: 12px;
+      transition: border-color .16s ease, color .16s ease, background .16s ease;
+    }
+
+    .top-button:hover:not(:disabled), .icon-button:hover:not(:disabled) {
+      border-color: var(--line-strong);
+      color: var(--text);
+      background: var(--panel-soft);
+    }
+
+    .top-button:disabled, .icon-button:disabled {
+      opacity: .42;
+    }
+
+    .top-button .soon {
+      color: var(--muted);
+      font-size: 10px;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    .history-count {
+      min-width: 17px;
+      height: 17px;
+      display: inline-grid;
+      place-items: center;
+      padding: 0 4px;
+      border-radius: 9px;
+      background: var(--accent);
+      color: var(--accent-ink);
+      font: 700 10px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .hero {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 24px;
+      padding: 16px 44px 30px;
+    }
+
+    .eyebrow {
+      margin: 0 0 13px;
+      color: var(--accent);
+      font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 720px;
+      font-size: clamp(31px, 4vw, 54px);
+      line-height: 1.03;
+      letter-spacing: -0.045em;
+    }
+
+    .hero-copy {
+      max-width: 370px;
+      margin: 0 0 3px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .hero-library {
+      width: 220px;
+      margin: 0 0 3px;
+    }
+
+    .hero-library .setting-label {
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .hero-library .select-wrap,
+    .hero-library select {
+      width: 100%;
+    }
+
+    .workspace {
+      flex: 1;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 48px minmax(0, 1fr);
+      gap: 0;
+      padding: 0 44px 30px;
+    }
+
+    .editor-panel {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      min-height: 590px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 17px 0 19px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel-deep);
+    }
+
+    .panel-heading {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .panel-index {
+      color: var(--muted);
+      font: 12px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .panel-title {
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .panel-tag {
+      padding: 5px 7px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      color: var(--muted);
+      font: 10px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .panel-tools {
+      display: flex;
+      gap: 6px;
+    }
+
+    .icon-button {
+      width: 31px;
+      height: 30px;
+      padding: 0;
+      border-radius: 5px;
+      font-size: 14px;
+    }
+
+    .icon-button.accent {
+      border-color: rgba(231, 255, 88, .4);
+      color: var(--accent);
+    }
+
+    .editor-wrap {
+      position: relative;
+      flex: 1;
+      display: flex;
+      min-height: 0;
+    }
+
+    .line-numbers {
+      width: 45px;
+      flex: 0 0 45px;
+      padding-top: 21px;
+      border-right: 1px solid var(--line);
+      color: #5b5854;
+      font: 12px/1.72 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      text-align: right;
+      user-select: none;
+    }
+
+    .line-numbers span {
+      display: block;
+      padding-right: 12px;
+      height: 20.6px;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 0;
+      resize: none;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: var(--text);
+      font: 13px/1.72 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      tab-size: 2;
+    }
+
+    .editor {
+      flex: 1;
+      padding: 18px 20px 24px;
+      white-space: pre;
+      overflow: auto;
+    }
+
+    .editor::placeholder {
+      color: #68645f;
+      opacity: 1;
+    }
+
+    .output-editor {
+      color: #d8e3bc;
+    }
+
+    .output-editor.is-empty {
+      color: var(--muted);
+    }
+
+    .panel-footer {
+      min-height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 0 18px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 10px rgba(231, 255, 88, .65);
+    }
+
+    .status-dot.error {
+      background: var(--danger);
+      box-shadow: 0 0 10px rgba(255, 155, 143, .5);
+    }
+
+    .shortcut {
+      color: #696662;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .swap-column {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .swap-button {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      background: var(--bg);
+      color: var(--accent);
+      font-size: 16px;
+      transition: transform .2s ease, border-color .16s ease, background .16s ease;
+    }
+
+    .swap-button:hover {
+      transform: rotate(180deg);
+      border-color: var(--accent);
+      background: var(--panel-soft);
+    }
+
+    .settings-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin: 0 44px 30px;
+      padding: 14px 16px;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .settings-left, .settings-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .setting-label {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .select-wrap {
+      position: relative;
+    }
+
+    select {
+      appearance: none;
+      min-width: 150px;
+      height: 32px;
+      padding: 0 31px 0 10px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      outline: 0;
+      background: var(--panel);
+      color: var(--text);
+      font-size: 12px;
+    }
+
+    .select-wrap::after {
+      content: "⌄";
+      position: absolute;
+      top: 7px;
+      right: 10px;
+      color: var(--muted);
+      pointer-events: none;
+    }
+
+    .tip {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .keyboard-key {
+      padding: 3px 6px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      color: var(--muted-strong);
+      font: 10px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .toast {
+      position: fixed;
+      right: 28px;
+      bottom: 26px;
+      z-index: 999;
+      padding: 11px 14px;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      background: #252525;
+      /* color: var(--text); */
+      color: #83a8ff;
+      font-size: 12px;
+      box-shadow: var(--shadow);
+    }
+
+    .history-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 5;
+      background: rgba(0, 0, 0, .58);
+    }
+
+    .history-drawer {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: min(440px, 100vw);
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      border-left: 1px solid var(--line-strong);
+      background: var(--panel);
+      box-shadow: -18px 0 50px rgba(0, 0, 0, .3);
+    }
+
+    .history-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 28px 24px 22px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel-deep);
+    }
+
+    .history-eyebrow {
+      margin: 0 0 8px;
+      color: var(--accent);
+      font: 700 10px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      letter-spacing: .15em;
+      text-transform: uppercase;
+    }
+
+    .history-title {
+      margin: 0;
+      font-size: 22px;
+      letter-spacing: -.02em;
+    }
+
+    .history-title-count {
+      margin-left: 5px;
+      color: var(--muted);
+      font: 12px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .history-close {
+      flex: 0 0 auto;
+    }
+
+    .history-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 48px;
+      padding: 0 24px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .history-clear {
+      border: 0;
+      background: transparent;
+      color: var(--danger);
+      font-size: 11px;
+    }
+
+    .history-clear:hover {
+      color: var(--text);
+    }
+
+    .history-list {
+      flex: 1;
+      padding: 14px 16px 24px;
+      overflow: auto;
+    }
+
+    .history-item {
+      margin-bottom: 10px;
+      padding: 15px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel-deep);
+    }
+
+    .history-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .history-item-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .history-library {
+      color: var(--accent);
+      font: 10px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .history-time {
+      color: var(--muted);
+      font: 14px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .history-url {
+      margin: 0 0 10px;
+      overflow: hidden;
+      color: var(--text);
+      font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .history-command {
+      max-height: 58px;
+      margin: 0 0 14px;
+      overflow: hidden;
+      color: var(--muted);
+      font: 11px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .history-actions {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .history-action {
+      height: 28px;
+      padding: 0 9px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: transparent;
+      color: var(--muted-strong);
+      font-size: 11px;
+    }
+
+    .history-action:hover {
+      border-color: var(--line-strong);
+      background: var(--panel-soft);
+      color: var(--text);
+    }
+
+    .history-action.delete {
+      width: 29px;
+      margin-left: auto;
+      padding: 0;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .history-empty {
+      display: grid;
+      place-items: center;
+      flex: 1;
+      padding: 30px;
+      color: var(--muted);
+      text-align: center;
+      font-size: 12px;
+      line-height: 1.7;
+    }
+
+    @media (max-width: 900px) {
+      .topbar, .hero { padding-left: 24px; padding-right: 24px; }
+      .workspace { padding-left: 24px; padding-right: 24px; }
+      .settings-bar { margin-left: 24px; margin-right: 24px; }
+      .hero { align-items: start; flex-direction: column; padding-top: 34px; }
+      .hero-copy { max-width: 540px; }
+      .workspace { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+      .swap-column { height: 28px; }
+      .swap-button { transform: rotate(90deg); }
+      .swap-button:hover { transform: rotate(270deg); }
+      .editor-panel { min-height: 440px; }
+    }
+
+    @media (max-width: 620px) {
+      .topbar { height: auto; min-height: 68px; padding-top: 14px; padding-bottom: 14px; }
+      .brand-subtitle, .top-button .soon { display: none; }
+      .top-actions { gap: 5px; }
+      .top-button { padding: 0 8px; }
+      .top-button:first-child { display: none; }
+      .hero { padding-top: 27px; padding-bottom: 23px; }
+      h1 { font-size: 34px; }
+      .workspace { padding: 0 14px 20px; }
+      .settings-bar { align-items: flex-start; flex-direction: column; margin: 0 14px 22px; }
+      .settings-right { width: 100%; justify-content: space-between; }
+      .hero-library { width: 100%; max-width: 320px; margin-top: 4px; }
+      .editor-panel { min-height: 390px; }
+      .panel-header { padding-left: 14px; padding-right: 12px; }
+      .editor { padding-left: 14px; padding-right: 14px; }
+      .history-header { padding-left: 18px; padding-right: 18px; }
+      .history-toolbar { padding-left: 18px; padding-right: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app" class="app-shell" @keydown.esc.window="closeHistory">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark">&gt;_</div>
+        <div class="brand-name">curlcraft</div>
+        <div class="brand-subtitle">request translator</div>
+      </div>
+      <nav class="top-actions" aria-label="工具">
+        <button class="top-button" type="button" @click="loadExample">示例</button>
+        <button class="top-button" type="button" @click="toggleHistory" :aria-expanded="historyOpen" title="打开历史记录">
+          历史 <span v-if="historyRecords.length" class="history-count">{{ historyRecords.length }}</span>
+        </button>
+        <button class="top-button" type="button" disabled title="主题设置功能正在开发">设置 <span class="soon">soon</span></button>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div>
+          <p class="eyebrow">curl → python / requests</p>
+          <!-- <h1>把命令行请求，<br>变成可读的代码。</h1> -->
+        </div>
+        <div class="hero-library">
+          <!-- <span class="setting-label">目标请求库</span> -->
+          <div class="select-wrap">
+            <select v-model="targetLibrary" aria-label="目标请求库">
+              <option value="requests">Python · requests</option>
+              <option value="curl_cffi_async">Python · curl_cffi（异步）</option>
+              <option value="httpx_async">Python · httpx（异步）</option>
+              <option value="aiohttp_async">Python · aiohttp（异步）</option>
+              <option disabled>Node · fetch（待开发）</option>
+              <option disabled>Go · net/http（待开发）</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <section class="workspace" aria-label="转换工作区">
+        <section class="editor-panel">
+          <div class="panel-header">
+            <div class="panel-heading">
+              <span class="panel-index">01</span>
+              <span class="panel-title">Curl command</span>
+              <span class="panel-tag">INPUT</span>
+            </div>
+            <div class="panel-tools">
+              <button class="icon-button" type="button" @click="clearInput" title="清空输入">×</button>
+              <button class="icon-button accent" type="button" @click="loadExample" title="载入示例">↙</button>
+            </div>
+          </div>
+          <div class="editor-wrap">
+            <div class="line-numbers" aria-hidden="true">
+              <span v-for="line in inputLineCount" :key="line">{{ line }}</span>
+            </div>
+            <textarea
+              ref="inputEditor"
+              v-model="curlInput"
+              class="editor"
+              aria-label="Curl 命令输入"
+              spellcheck="false"
+              placeholder="curl 'https://www.baidu.com/s?wd=%E7%88%AC%E8%99%AB' \
+  -H 'Accept-Language: zh-CN,zh;q=0.9,en;q=0.8' \
+  -H 'Cookie: PSTM=1629808491; ' \
+  --compressed"
+              @keydown.tab.prevent="insertTab"
+              @keydown.ctrl.enter.prevent="copyOutput"
+            ></textarea>
+          </div>
+          <div class="panel-footer">
+            <span class="status">
+              <span class="status-dot" :class="{ error: hasError }"></span>
+              {{ inputStatus }}
+            </span>
+            <span class="shortcut">CTRL + ENTER 转换并复制</span>
+          </div>
+        </section>
+
+        <div class="swap-column">
+          <button class="swap-button" type="button" @click="swapContent" title="交换左右内容">⇄</button>
+        </div>
+
+        <section class="editor-panel">
+          <div class="panel-header">
+            <div class="panel-heading">
+              <span class="panel-index">02</span>
+              <span class="panel-title">Python / Requests</span>
+              <span class="panel-tag">OUTPUT</span>
+            </div>
+            <div class="panel-tools">
+              <button class="icon-button" type="button" @click="formatOutput" title="格式化输出">⌘</button>
+              <button class="icon-button accent" type="button" @click="copyOutput" title="复制 Python 代码">⧉</button>
+            </div>
+          </div>
+          <div class="editor-wrap">
+            <div class="line-numbers" aria-hidden="true">
+              <span v-for="line in outputLineCount" :key="line">{{ line }}</span>
+            </div>
+            <textarea
+              v-model="pythonOutput"
+              class="editor output-editor"
+              :class="{ 'is-empty': !pythonOutput }"
+              aria-label="Python Requests 输出"
+              spellcheck="false"
+              placeholder="# Python Requests code will appear here"
+              @keydown.tab.prevent="insertTab"
+            ></textarea>
+          </div>
+          <div class="panel-footer">
+            <span class="status">{{ outputStatus }}</span>
+            <span class="shortcut">可直接编辑结果</span>
+          </div>
+        </section>
+      </section>
+
+      <section class="settings-bar">
+        <div class="settings-right">
+          <span class="tip">粘贴一段 Curl 命令，右侧会即时生成 Python Requests 代码。所有转换都在浏览器本地完成。</span>
+          <span class="keyboard-key">LOCAL ONLY</span>
+        </div>
+      </section>
+    </main>
+
+    <div v-if="toastMessage" class="toast" role="status">{{ toastMessage }}</div>
+
+    <div v-if="historyOpen" class="history-overlay" @click.self="closeHistory">
+      <aside class="history-drawer" role="dialog" aria-modal="true" aria-labelledby="history-title">
+        <header class="history-header">
+          <div>
+            <p class="history-eyebrow">LOCAL HISTORY</p>
+            <h2 id="history-title" class="history-title">
+              历史记录
+              <span class="history-title-count">{{ historyRecords.length }} 条</span>
+            </h2>
+          </div>
+          <button class="icon-button history-close" type="button" @click="closeHistory" title="关闭历史记录">×</button>
+        </header>
+
+        <div v-if="historyRecords.length" class="history-toolbar">
+          <span>最近转换的命令</span>
+          <button class="history-clear" type="button" @click="clearHistory">清空全部</button>
+        </div>
+
+        <div v-if="historyRecords.length" class="history-list">
+          <article v-for="record in historyRecords" :key="record.id" class="history-item">
+            <div class="history-item-meta">
+              <span class="history-library">{{ getLibraryLabel(record.targetLibrary) }}</span>
+              <time class="history-time">{{ formatHistoryTime(record.createdAt) }}</time>
+            </div>
+            <p class="history-url">{{ getHistoryTitle(record.curl) }}</p>
+            <pre class="history-command">{{ record.curl }}</pre>
+            <div class="history-actions">
+              <button class="history-action" type="button" @click="restoreHistory(record)">恢复</button>
+              <button class="history-action" type="button" @click="copyHistory(record)">复制代码</button>
+              <button class="history-action delete" type="button" @click="deleteHistory(record.id)" title="删除这条记录">×</button>
+            </div>
+          </article>
+        </div>
+
+        <div v-else class="history-empty">
+          <div>还没有历史记录<br>成功转换的命令会自动出现在这里</div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/vue@3.5.42/dist/vue.global.js"></script>
+  <script>
+    const { createApp } = Vue;
+
+    const EXAMPLE = `curl 'https://www.baidu.com/s?wd=%E7%88%AC%E8%99%AB' \\
+  -H 'Accept-Language: zh-CN,zh;q=0.9,en;q=0.8' \\
+  -H 'Cookie: PSTM=1629808491; ' \\
+  --compressed`;
+    const HISTORY_STORAGE_KEY = "curlcraft-history-v1";
+    const HISTORY_LIMIT = 50;
+
+    function getStoredHistory() {
+      try {
+        const stored = JSON.parse(localStorage.getItem(HISTORY_STORAGE_KEY) || "[]");
+        if (!Array.isArray(stored)) return [];
+        const seen = new Set();
+        return stored
+          .filter((record) => record && typeof record.curl === "string" && typeof record.output === "string")
+          .map((record) => ({
+            ...record,
+            curl: record.curl.trim(),
+            targetLibrary: record.targetLibrary || "requests",
+            createdAt: Number(record.createdAt) || 0
+          }))
+          .sort((a, b) => b.createdAt - a.createdAt)
+          .filter((record) => {
+            const key = `${record.targetLibrary}\u0000${record.curl}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          })
+          .slice(0, HISTORY_LIMIT);
+      } catch {
+        return [];
+      }
+    }
+
+    function shellTokenize(command) {
+      const tokens = [];
+      let current = "";
+      let quote = null;
+      let escaping = false;
+
+      for (const char of command) {
+        if (escaping) {
+          current += char;
+          escaping = false;
+        } else if (char === "\\" && quote !== "'") {
+          escaping = true;
+        } else if (quote && char === quote) {
+          quote = null;
+        } else if (!quote && (char === "'" || char === '"')) {
+          quote = char;
+        } else if (!quote && /\s/.test(char)) {
+          if (current) {
+            tokens.push(current);
+            current = "";
+          }
+        } else {
+          current += char;
+        }
+      }
+
+      if (escaping) current += "\\";
+      if (current) tokens.push(current);
+      return { tokens, unterminatedQuote: Boolean(quote) };
+    }
+
+    function pythonString(value) {
+      return JSON.stringify(value)
+        .replace(/\u2028/g, "\\u2028")
+        .replace(/\u2029/g, "\\u2029");
+    }
+
+    function pythonLiteral(value, level = 0) {
+      if (value === null) return "None";
+      if (typeof value === "boolean") return value ? "True" : "False";
+      if (typeof value === "string") return pythonString(value);
+      if (typeof value === "number") return String(value);
+      if (Array.isArray(value)) {
+        return `[${value.map((item) => pythonLiteral(item, level + 1)).join(", ")}]`;
+      }
+      const indent = "    ".repeat(level);
+      const childIndent = "    ".repeat(level + 1);
+      const entries = Object.entries(value).map(([key, item]) => (
+        `${childIndent}${pythonString(key)}: ${pythonLiteral(item, level + 1)},`
+      ));
+      return entries.length
+        ? `{\n${entries.join("\n")}\n${indent}}`
+        : "{}";
+    }
+
+    function parseCurl(command) {
+      const normalized = command
+        .replace(/\\\r?\n/g, " ")
+        .replace(/\r?\n/g, " ")
+        .trim();
+      const { tokens, unterminatedQuote } = shellTokenize(normalized);
+
+      if (!tokens.length || tokens[0].toLowerCase() !== "curl") {
+        throw new Error("请输入以 curl 开头的命令");
+      }
+      if (unterminatedQuote) {
+        throw new Error("检测到未闭合的引号");
+      }
+
+      const request = { method: null, url: "", headers: [], data: [], files: [], auth: null, compressed: false };
+      const ignored = [];
+      let queryMode = false;
+
+      const takeValue = (index, flag) => {
+        if (index + 1 >= tokens.length) throw new Error(`${flag} 缺少参数`);
+        return tokens[index + 1];
+      };
+
+      for (let i = 1; i < tokens.length; i += 1) {
+        const token = tokens[i];
+        if (token === "--") {
+          if (tokens[i + 1]) request.url = tokens[i + 1];
+          break;
+        }
+        if (token === "-G" || token === "--get") {
+          queryMode = true;
+          request.method = "GET";
+        } else if (token === "-X" || token === "--request") {
+          request.method = takeValue(i, token).toUpperCase();
+          i += 1;
+        } else if (token === "-H" || token === "--header") {
+          const header = takeValue(i, token);
+          const separator = header.indexOf(":");
+          if (separator > 0) {
+            request.headers.push([header.slice(0, separator).trim(), header.slice(separator + 1).trim()]);
+          } else {
+            ignored.push(`未识别请求头：${header}`);
+          }
+          i += 1;
+        } else if (/^-H.+/.test(token)) {
+          const header = token.slice(2);
+          const separator = header.indexOf(":");
+          if (separator > 0) request.headers.push([header.slice(0, separator).trim(), header.slice(separator + 1).trim()]);
+        } else if (["-d", "--data", "--data-raw", "--data-binary", "--data-urlencode", "--json"].includes(token)) {
+          request.data.push(takeValue(i, token));
+          i += 1;
+        } else if (token === "-F" || token === "--form") {
+          request.files.push(takeValue(i, token));
+          i += 1;
+        } else if (token === "-u" || token === "--user") {
+          request.auth = takeValue(i, token);
+          i += 1;
+        } else if (token === "--compressed") {
+          request.compressed = true;
+        } else if (token === "--url") {
+          request.url = takeValue(i, token);
+          i += 1;
+        } else if (token === "--data-raw" && tokens[i + 1]) {
+          request.data.push(tokens[i + 1]);
+          i += 1;
+        } else if (token.startsWith("-")) {
+          ignored.push(`已跳过参数：${token}`);
+          if (["-A", "--user-agent", "-e", "--referer", "-b", "--cookie", "--connect-timeout", "--max-time"].includes(token)) i += 1;
+        } else if (!request.url) {
+          request.url = token;
+        } else {
+          ignored.push(`未识别值：${token}`);
+        }
+      }
+
+      if (!request.url) throw new Error("没有找到请求 URL");
+      return { request, ignored, queryMode };
+    }
+
+    function convertToRequests(command, targetLibrary = "requests") {
+      const { request, ignored, queryMode } = parseCurl(command);
+      const isCurlCffiAsync = targetLibrary === "curl_cffi_async";
+      const isHttpxAsync = targetLibrary === "httpx_async";
+      const isAiohttpAsync = targetLibrary === "aiohttp_async";
+      const isAsync = isCurlCffiAsync || isHttpxAsync || isAiohttpAsync;
+      let url = request.url;
+      const query = [];
+      const queryIndex = url.indexOf("?");
+
+      if (queryIndex >= 0) {
+        const queryString = url.slice(queryIndex + 1);
+        url = url.slice(0, queryIndex);
+        queryString.split("&").filter(Boolean).forEach((item) => {
+          const [key, ...rest] = item.split("=");
+          query.push([decodeURIComponent(key), decodeURIComponent(rest.join("=") || "")]);
+        });
+      }
+
+      const headers = request.headers.filter(([key]) => !["content-length", "host"].includes(key.toLowerCase()));
+      let body = request.data.join("&");
+      const contentType = headers.find(([key]) => key.toLowerCase() === "content-type")?.[1].toLowerCase() || "";
+      const method = request.method || (request.files.length || request.data.length ? "POST" : "GET");
+
+      if (queryMode && body && !contentType.includes("json")) {
+        body.split("&").filter(Boolean).forEach((item) => {
+          const [key, ...rest] = item.split("=");
+          query.push([decodeURIComponent(key), decodeURIComponent(rest.join("=") || "")]);
+        });
+        body = "";
+      }
+
+      let lines;
+      if (isCurlCffiAsync) {
+        lines = ["import asyncio", "from curl_cffi import requests", "", `url = ${pythonString(url)}`];
+      } else if (isHttpxAsync) {
+        lines = ["import asyncio", "import httpx", "", `url = ${pythonString(url)}`];
+      } else if (isAiohttpAsync) {
+        lines = ["import asyncio", "import aiohttp", "", `url = ${pythonString(url)}`];
+      } else {
+        lines = ["from curl_cffi import requests", "", `url = ${pythonString(url)}`];
+      }
+
+      if (query.length) {
+        lines.push("params = {");
+        query.forEach(([key, value]) => lines.push(`    ${pythonString(key)}: ${pythonString(value)},`));
+        lines.push("}");
+      }
+
+      if (headers.length) {
+        lines.push("headers = {");
+        headers.forEach(([key, value]) => lines.push(`    ${pythonString(key)}: ${pythonString(value)},`));
+        lines.push("}");
+      }
+
+      if (request.auth) {
+        const separator = request.auth.indexOf(":");
+        const username = separator >= 0 ? request.auth.slice(0, separator) : request.auth;
+        const password = separator >= 0 ? request.auth.slice(separator + 1) : "";
+        if (isAiohttpAsync) {
+          lines.push(`auth = aiohttp.BasicAuth(${pythonString(username)}, ${pythonString(password)})`);
+        } else {
+          lines.push(`auth = (${pythonString(username)}, ${pythonString(password)})`);
+        }
+      }
+
+      if (request.files.length && isAiohttpAsync) {
+        lines.push("form_data = aiohttp.FormData()");
+        request.files.forEach((item) => {
+          const separator = item.indexOf("=");
+          const key = separator > 0 ? item.slice(0, separator) : "file";
+          const value = separator > 0 ? item.slice(separator + 1) : item;
+          if (value.startsWith("@")) {
+            const path = value.slice(1);
+            const filename = path.split(/[\\/]/).pop();
+            lines.push(`form_data.add_field(${pythonString(key)}, open(${pythonString(path)}, "rb"), filename=${pythonString(filename)})`);
+          } else {
+            lines.push(`form_data.add_field(${pythonString(key)}, ${pythonString(value)})`);
+          }
+        });
+      } else if (request.files.length) {
+        lines.push("files = {");
+        request.files.forEach((item) => {
+          const separator = item.indexOf("=");
+          const key = separator > 0 ? item.slice(0, separator) : "file";
+          const value = separator > 0 ? item.slice(separator + 1) : item;
+          const fileValue = value.startsWith("@")
+            ? `open(${pythonString(value.slice(1))}, "rb")`
+            : pythonString(value);
+          lines.push(`    ${pythonString(key)}: ${fileValue},`);
+        });
+        lines.push("}");
+      }
+
+      if (body && contentType.includes("json")) {
+        try {
+          const parsed = JSON.parse(body);
+          lines.push(`json_data = ${pythonLiteral(parsed)}`);
+        } catch {
+          lines.push(`json_data = ${pythonString(body)}`);
+        }
+      } else if (body) {
+        lines.push(`data = ${pythonString(body)}`);
+      }
+
+      const argumentIndent = isAsync ? "            " : "    ";
+      const callPrefix = isCurlCffiAsync
+        ? "await session."
+        : isHttpxAsync
+          ? "await client."
+          : isAiohttpAsync
+            ? "session."
+            : "requests.";
+      const args = [`${callPrefix}${method.toLowerCase()}(`, `${argumentIndent}url`];
+      if (query.length) args.push(`${argumentIndent}params=params`);
+      if (headers.length) args.push(`${argumentIndent}headers=headers`);
+      if (request.auth) args.push(`${argumentIndent}auth=auth`);
+      if (request.files.length) args.push(`${argumentIndent}${isAiohttpAsync ? "data=form_data" : "files=files"}`);
+      if (body && contentType.includes("json")) args.push(`${argumentIndent}json=json_data`);
+      else if (body) args.push(`${argumentIndent}data=data`);
+
+      if (isAiohttpAsync) {
+        lines.push(
+          "",
+          "async def fetch():",
+          "    async with aiohttp.ClientSession() as session:",
+          `        async with ${args[0]}`,
+          args.slice(1).map((line) => `${line},`).join("\n"),
+          "        ) as response:",
+          "            response_text = await response.text()",
+          "            return response.status, response_text",
+          "",
+          'if __name__ == "__main__":',
+          "    status_code, response_text = asyncio.run(fetch())",
+          "    print(status_code)",
+          "    print(response_text)"
+        );
+      } else if (isAsync) {
+        const clientSetup = isHttpxAsync
+          ? "    async with httpx.AsyncClient() as client:"
+          : "    async with requests.AsyncSession() as session:";
+        lines.push(
+          "",
+          "async def fetch():",
+          clientSetup,
+          `        response = ${args[0]}`,
+          args.slice(1).map((line) => `${line},`).join("\n"),
+          "        )",
+          "    return response",
+          "",
+          'if __name__ == "__main__":',
+          "    response = asyncio.run(fetch())",
+          "    print(response.status_code)",
+          "    print(response.text)"
+        );
+      } else {
+        lines.push(
+          `response = ${args[0]}`,
+          args.slice(1).map((line) => `${line},`).join("\n"),
+          ")",
+          "",
+          "print(response.status_code)",
+          "print(response.text)"
+        );
+      }
+
+      return { code: lines.join("\n"), ignored };
+    }
+
+    createApp({
+      data() {
+        return {
+          curlInput: EXAMPLE,
+          pythonOutput: "",
+          targetLibrary: "requests",
+          toastMessage: "",
+          hasError: false,
+          inputStatus: "等待转换",
+          outputStatus: "实时生成",
+          toastTimer: null,
+          historyOpen: false,
+          historyRecords: getStoredHistory(),
+          historySaveTimer: null
+        };
+      },
+      computed: {
+        inputLineCount() {
+          return Math.max(1, this.curlInput.split("\n").length);
+        },
+        outputLineCount() {
+          return Math.max(1, this.pythonOutput.split("\n").length);
+        }
+      },
+      watch: {
+        curlInput: {
+          handler() {
+            this.convert();
+            if (this.curlInput.trim()) this.queueHistorySave();
+          },
+          immediate: true
+        },
+        targetLibrary: {
+          handler() {
+            this.convert();
+            if (this.curlInput.trim()) this.queueHistorySave();
+          }
+        }
+      },
+      methods: {
+        showToast(message) {
+          this.toastMessage = message;
+          clearTimeout(this.toastTimer);
+          this.toastTimer = setTimeout(() => { this.toastMessage = ""; }, 2200);
+        },
+
+        queueHistorySave() {
+          if (this.pythonOutput.includes("www.baidu.com")) return;
+
+          clearTimeout(this.historySaveTimer);
+          this.historySaveTimer = setTimeout(() => { this.saveHistory(); }, 650);
+        },
+
+        saveHistory() {
+          if (!this.curlInput.trim() || this.hasError || !this.pythonOutput) return;
+
+          const curl = this.curlInput.trim();
+          const recordKey = `${this.targetLibrary}\u0000${curl}`;
+          const existingRecords = this.historyRecords.filter((record) => (
+            `${record.targetLibrary || "requests"}\u0000${record.curl.trim()}` !== recordKey
+          ));
+
+          const record = {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            curl,
+            output: this.pythonOutput,
+            targetLibrary: this.targetLibrary,
+            createdAt: Date.now()
+          };
+          this.historyRecords = [record, ...existingRecords].slice(0, HISTORY_LIMIT);
+          try {
+            localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(this.historyRecords));
+          } catch {
+            // Keep the current session history available if storage is unavailable.
+          }
+        },
+
+        persistHistory() {
+          try {
+            localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(this.historyRecords));
+          } catch {
+            // Ignore storage errors; the in-memory list still works.
+          }
+        },
+
+        toggleHistory() {
+          this.historyOpen = !this.historyOpen;
+        },
+
+        closeHistory() {
+          this.historyOpen = false;
+        },
+
+        getLibraryLabel(targetLibrary) {
+          const labels = {
+            requests: "PYTHON / REQUESTS",
+            curl_cffi_async: "PYTHON / CURL_CFFI ASYNC",
+            httpx_async: "PYTHON / HTTPX ASYNC",
+            aiohttp_async: "PYTHON / AIOHTTP ASYNC"
+          };
+          return labels[targetLibrary] || "PYTHON";
+        },
+
+        getHistoryTitle(curl) {
+          const tokens = shellTokenize(curl.replace(/\\\r?\n/g, " ")).tokens;
+          return tokens.find((token) => /^https?:\/\//i.test(token)) || tokens[0] || "未命名请求";
+        },
+
+        formatHistoryTime(timestamp) {
+          const date = new Date(timestamp);
+          if (Number.isNaN(date.getTime())) return "";
+          const now = new Date();
+          const sameDay = date.toDateString() === now.toDateString();
+          return sameDay
+            ? date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })
+            : date.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" });
+        },
+
+        restoreHistory(record) {
+          this.targetLibrary = record.targetLibrary || "requests";
+          this.curlInput = record.curl;
+          this.pythonOutput = record.output;
+          this.hasError = false;
+          this.inputStatus = "已恢复";
+          this.outputStatus = `${this.pythonOutput.split("\n").length} 行 Python`;
+          this.closeHistory();
+          this.showToast("历史记录已恢复");
+        },
+
+        async copyHistory(record) {
+          try {
+            await navigator.clipboard.writeText(record.output);
+            this.showToast("历史代码已复制");
+          } catch {
+            this.showToast("复制失败，请手动选择文本");
+          }
+        },
+
+        deleteHistory(id) {
+          this.historyRecords = this.historyRecords.filter((record) => record.id !== id);
+          this.persistHistory();
+        },
+
+        clearHistory() {
+          if (!window.confirm("确定要清空全部历史记录吗？")) return;
+          this.historyRecords = [];
+          this.persistHistory();
+          this.showToast("历史记录已清空");
+        },
+
+        convert() {
+          if (!this.curlInput.trim()) {
+            this.pythonOutput = "";
+            this.hasError = false;
+            this.inputStatus = "等待输入";
+            this.outputStatus = "暂无输出";
+            return;
+          }
+          try {
+            const result = convertToRequests(this.curlInput, this.targetLibrary);
+            this.pythonOutput = result.code;
+            this.hasError = false;
+            this.inputStatus = result.ignored.length ? `${result.ignored.length} 个参数已跳过` : "已转换";
+            this.outputStatus = `${this.pythonOutput.split("\n").length} 行 Python`;
+          } catch (error) {
+            this.pythonOutput = `# ${error.message}\n# 请检查左侧 Curl 命令后重试`;
+            this.hasError = true;
+            this.inputStatus = error.message;
+            this.outputStatus = "转换失败";
+          }
+        },
+
+        loadExample() {
+          this.curlInput = EXAMPLE;
+          this.showToast("已载入示例命令");
+        },
+
+        clearInput() {
+          this.curlInput = "";
+          this.showToast("已清空");
+        },
+
+        async copyOutput() {
+          if (!this.pythonOutput || this.hasError) {
+            this.showToast("暂无可复制的 Python 代码");
+            return;
+          }
+          try {
+            await navigator.clipboard.writeText(this.pythonOutput);
+            this.showToast("Python 代码已复制");
+          } catch {
+            this.showToast("复制失败，请手动选择文本");
+          }
+        },
+
+        swapContent() {
+          const previousInput = this.curlInput;
+          this.curlInput = this.pythonOutput;
+          this.pythonOutput = previousInput;
+          this.hasError = false;
+          this.inputStatus = "内容已交换";
+          this.outputStatus = "可编辑";
+        },
+
+        formatOutput() {
+          if (!this.pythonOutput) return;
+          this.pythonOutput = this.pythonOutput
+            .replace(/[ \t]+$/gm, "")
+            .replace(/\n{3,}/g, "\n\n");
+          this.showToast("输出已整理");
+        },
+
+        insertTab(event) {
+          const target = event.target;
+          const start = target.selectionStart;
+          const end = target.selectionEnd;
+          const value = target.value;
+          target.value = `${value.slice(0, start)}  ${value.slice(end)}`;
+          target.selectionStart = target.selectionEnd = start + 2;
+          target.dispatchEvent(new Event("input"));
+        }
+      }
+    }).mount("#app");
+  </script>
+</body>
+</html>
