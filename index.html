@@ -349,8 +349,11 @@
     }
 
     .swap-column {
-      display: flex;
+      /* display: flex;
       align-items: center;
+      justify-content: center; */
+
+      display: grid;
       justify-content: center;
     }
 
@@ -461,7 +464,7 @@
       position: absolute;
       top: 0;
       right: 0;
-      width: min(440px, 100vw);
+      width: min(540px, 100vw);
       height: 100%;
       display: flex;
       flex-direction: column;
@@ -554,7 +557,7 @@
 
     .history-library {
       color: var(--accent);
-      font: 10px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font: 14px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     }
 
     .history-time {
@@ -607,7 +610,7 @@
       width: 29px;
       margin-left: auto;
       padding: 0;
-      color: var(--muted);
+      color: #ff9b8f;
       font-size: 15px;
     }
 
@@ -661,13 +664,15 @@
       <div class="brand">
         <div class="brand-mark">&gt;_</div>
         <div class="brand-name">curlcraft</div>
-        <div class="brand-subtitle">request translator</div>
+        <div class="brand-subtitle">request translator <a style="color: #83a8ff;">@author-mobai</a></div>
       </div>
       <nav class="top-actions" aria-label="工具">
         <button class="top-button" type="button" @click="loadExample">示例</button>
         <button class="top-button" type="button" @click="toggleHistory" :aria-expanded="historyOpen" title="打开历史记录">
           历史 <span v-if="historyRecords.length" class="history-count">{{ historyRecords.length }}</span>
         </button>
+        <a class="top-button" href="https://spidertools.cn/#/formatJSON" target="_blank" style="color: rgb(33, 150, 243);"> json格式化 </a>
+
         <button class="top-button" type="button" disabled title="主题设置功能正在开发">设置 <span class="soon">soon</span></button>
       </nav>
     </header>
@@ -734,7 +739,9 @@
         </section>
 
         <div class="swap-column">
-          <button class="swap-button" type="button" @click="swapContent" title="交换左右内容">⇄</button>
+          <button class="swap-button" type="button" @click="toggleHistory" title="打开历史记录">H</button>
+          <button class="swap-button" type="button" @click="swapContent2" title="交换左右内容">⇄</button>
+
         </div>
 
         <section class="editor-panel">
@@ -799,16 +806,16 @@
         </div>
 
         <div v-if="historyRecords.length" class="history-list">
-          <article v-for="record in historyRecords" :key="record.id" class="history-item">
+          <article v-for="(record, index) in historyRecords" :key="record.id" class="history-item">
             <div class="history-item-meta">
-              <span class="history-library">{{ getLibraryLabel(record.targetLibrary) }}</span>
+              <span class="history-library"><a style="color: #c1bdb7;">{{index+1}}.</a>{{ getLibraryLabel(record.targetLibrary) }}</span>
               <time class="history-time">{{ formatHistoryTime(record.createdAt) }}</time>
             </div>
             <p class="history-url">{{ getHistoryTitle(record.curl) }}</p>
             <pre class="history-command">{{ record.curl }}</pre>
             <div class="history-actions">
-              <button class="history-action" type="button" @click="restoreHistory(record)">恢复</button>
-              <button class="history-action" type="button" @click="copyHistory(record)">复制代码</button>
+              <button class="history-action" type="button" @click="restoreHistory(record)" style="background: #0751fe52;color: #ffff;">恢复</button>
+              <button class="history-action" type="button" @click="copyHistory(record)" style="background: #0751fe52;color: #ffff;">复制代码</button>
               <button class="history-action delete" type="button" @click="deleteHistory(record.id)" title="删除这条记录">×</button>
             </div>
           </article>
@@ -1169,6 +1176,7 @@
           targetLibrary: "requests",
           toastMessage: "",
           hasError: false,
+          is_history_open: false,
           inputStatus: "等待转换",
           outputStatus: "实时生成",
           toastTimer: null,
@@ -1188,7 +1196,9 @@
       watch: {
         curlInput: {
           handler() {
+            
             this.convert();
+            
             if (this.curlInput.trim()) this.queueHistorySave();
           },
           immediate: true
@@ -1208,7 +1218,9 @@
         },
 
         queueHistorySave() {
-          if (this.pythonOutput.includes("www.baidu.com")) return;
+          
+
+          if (this.pythonOutput.includes("www.baidu.com")) return; // 如果包含 示例代码 特定字符串，则不保存
 
           clearTimeout(this.historySaveTimer);
           this.historySaveTimer = setTimeout(() => { this.saveHistory(); }, 650);
@@ -1216,6 +1228,11 @@
 
         saveHistory() {
           if (!this.curlInput.trim() || this.hasError || !this.pythonOutput) return;
+          if (this.is_history_open){
+            // alert("历史记录恢复,不保存")
+            this.is_history_open = false;
+            return
+          }
 
           const curl = this.curlInput.trim();
           const recordKey = `${this.targetLibrary}\u0000${curl}`;
@@ -1256,10 +1273,10 @@
 
         getLibraryLabel(targetLibrary) {
           const labels = {
-            requests: "PYTHON / REQUESTS",
-            curl_cffi_async: "PYTHON / CURL_CFFI ASYNC",
-            httpx_async: "PYTHON / HTTPX ASYNC",
-            aiohttp_async: "PYTHON / AIOHTTP ASYNC"
+            requests: "PYTHON / requests",
+            curl_cffi_async: "PYTHON / curl_cffi 异步",
+            httpx_async: "PYTHON / httpx 异步",
+            aiohttp_async: "PYTHON / aiohttp  异步"
           };
           return labels[targetLibrary] || "PYTHON";
         },
@@ -1269,7 +1286,7 @@
           return tokens.find((token) => /^https?:\/\//i.test(token)) || tokens[0] || "未命名请求";
         },
 
-        formatHistoryTime(timestamp) {
+        formatHistoryTime2(timestamp) {
           const date = new Date(timestamp);
           if (Number.isNaN(date.getTime())) return "";
           const now = new Date();
@@ -1278,12 +1295,41 @@
             ? date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })
             : date.toLocaleDateString("zh-CN", { month: "2-digit", day: "2-digit" });
         },
+        formatHistoryTime(timestamp) {
+          const date = new Date(timestamp);
+          if (Number.isNaN(date.getTime())) return "";
+
+          const now = new Date();
+          const sameDay = date.toDateString() === now.toDateString();
+
+          // 提取时、分、秒，并保证是两位数（不足补0）
+          const hh = String(date.getHours()).padStart(2, "0");
+          const mm = String(date.getMinutes()).padStart(2, "0");
+          const ss = String(date.getSeconds()).padStart(2, "0");
+          
+          // 拼接好时间部分：HH:mm:ss
+          const timeStr = `${hh}:${mm}:${ss}`;
+
+          if (sameDay) {
+            // 如果是今天，直接返回时分秒
+            return timeStr;
+          } else {
+            // 如果是历史日期，提取月和日（月份需要 +1）
+            const month = String(date.getMonth() + 1).padStart(2, "0");
+            const day = String(date.getDate()).padStart(2, "0");
+            
+            // 返回 月-日 时:分:秒
+            return `${month}-${day} ${timeStr}`;
+          }
+        },
 
         restoreHistory(record) {
+          this.is_history_open = true;
           this.targetLibrary = record.targetLibrary || "requests";
           this.curlInput = record.curl;
           this.pythonOutput = record.output;
           this.hasError = false;
+          
           this.inputStatus = "已恢复";
           this.outputStatus = `${this.pythonOutput.split("\n").length} 行 Python`;
           this.closeHistory();
